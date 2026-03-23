@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import ColorPicker from "./ColorPicker";
 import "./App.css";
 
 const BASE_URL = import.meta.env.BASE_URL;
@@ -336,18 +337,7 @@ function App() {
       <header className="header">
         <h1>House Color Picker</h1>
         <div className="controls">
-          {!editingMask && (
-            <>
-              <label htmlFor="color-picker">Wall Color</label>
-              <input
-                id="color-picker"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-              />
-              <span className="color-hex">{color}</span>
-            </>
-          )}
+          {!editingMask && null}
 
           {editingMask && (
             <>
@@ -386,20 +376,27 @@ function App() {
           </button>
         </div>
       </header>
-      <main className="canvas-container">
-        {!loaded && <p className="loading">Loading images...</p>}
-        <canvas
-          ref={canvasRef}
-          className={`house-canvas ${editingMask ? "editing" : ""}`}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={handlePointerUp}
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
-        />
-        <canvas ref={maskCanvasRef} style={{ display: "none" }} />
+      <main className="main-layout">
+        <div className="canvas-container">
+          {!loaded && <p className="loading">Loading images...</p>}
+          <canvas
+            ref={canvasRef}
+            className={`house-canvas ${editingMask ? "editing" : ""}`}
+            onMouseDown={handlePointerDown}
+            onMouseMove={handlePointerMove}
+            onMouseUp={handlePointerUp}
+            onMouseLeave={handlePointerUp}
+            onTouchStart={handlePointerDown}
+            onTouchMove={handlePointerMove}
+            onTouchEnd={handlePointerUp}
+          />
+          <canvas ref={maskCanvasRef} style={{ display: "none" }} />
+        </div>
+        {!editingMask && (
+          <aside className="sidebar">
+            <ColorPicker color={color} onChange={setColor} />
+          </aside>
+        )}
       </main>
     </div>
   );
