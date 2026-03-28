@@ -3,7 +3,6 @@ import ColorPicker from "./ColorPicker";
 import "./App.css";
 
 const BASE_URL = import.meta.env.BASE_URL;
-const MASK_STORAGE_KEY = "house-color-picker-mask";
 
 function hexToHsl(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -56,21 +55,9 @@ function App() {
         offscreen.height = baseImg.naturalHeight;
         const offCtx = offscreen.getContext("2d")!;
 
-        // Try loading saved mask from localStorage
-        const saved = localStorage.getItem(MASK_STORAGE_KEY);
-        if (saved) {
-          const savedImg = new Image();
-          savedImg.onload = () => {
-            offCtx.drawImage(savedImg, 0, 0, offscreen.width, offscreen.height);
-            maskDataRef.current = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-            setLoaded(true);
-          };
-          savedImg.src = saved;
-        } else {
-          offCtx.drawImage(maskImg, 0, 0, offscreen.width, offscreen.height);
-          maskDataRef.current = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-          setLoaded(true);
-        }
+        offCtx.drawImage(maskImg, 0, 0, offscreen.width, offscreen.height);
+        maskDataRef.current = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+        setLoaded(true);
       }
     };
 
@@ -80,8 +67,9 @@ function App() {
     maskImg.src = `${BASE_URL}house-mask.png`;
   }, []);
 
-  // Save mask to localStorage
-  const saveMask = useCallback(() => {
+  // Save mask to file (dev only)
+  const saveMask = useCallback(async () => {
+    if (!import.meta.env.DEV) return;
     const maskData = maskDataRef.current;
     if (!maskData) return;
     const offscreen = document.createElement("canvas");
@@ -89,7 +77,11 @@ function App() {
     offscreen.height = maskData.height;
     const ctx = offscreen.getContext("2d")!;
     ctx.putImageData(maskData, 0, 0);
-    localStorage.setItem(MASK_STORAGE_KEY, offscreen.toDataURL("image/png"));
+    await fetch("/api/save-mask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: offscreen.toDataURL("image/png") }),
+    });
   }, []);
 
   // Render the color-applied image
@@ -108,7 +100,7 @@ function App() {
     ctx.drawImage(baseImg, 0, 0);
     const baseData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    const [targetH, targetS] = hexToHsl(color);
+    const [targetH, targetS, targetL] = hexToHsl(color);
     const base = baseData.data;
     const mask = maskData.data;
     const result = ctx.createImageData(canvas.width, canvas.height);
@@ -135,7 +127,12 @@ function App() {
 
       const h = targetH;
       const s = targetS / 100;
-      const l = origL;
+      // Blend original pixel lightness with target lightness:
+      // targetL=0 → black, targetL=50 → original texture, targetL=100 → white
+      const tl = targetL / 100;
+      const l = tl <= 0.5
+        ? origL * (tl / 0.5)
+        : origL + (1 - origL) * ((tl - 0.5) / 0.5);
 
       const hslToChannel = (p: number, q: number, t: number) => {
         if (t < 0) t += 1;
@@ -307,7 +304,6 @@ function App() {
 
   // Reset mask to original
   const resetMask = useCallback(() => {
-    localStorage.removeItem(MASK_STORAGE_KEY);
     const maskImg = new Image();
     maskImg.onload = () => {
       const offscreen = document.createElement("canvas");
